@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  fullName       String     @map("full_name") @db.VarChar(255)
+  email          String     @unique @db.VarChar(255)
+  passwordHash   String     @map("password_hash") @db.Text
+  role           UserRole   @default(customer)
+  phone          String     @db.VarChar(50)
+  region         String     @db.VarChar(255)@default("")
+  status         UserStatus @default(active)
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  farmerListings Listing[]  @relation("FarmerListings")
+  customerOrders Order[]    @relation("CustomerOrders")
+  farmerOrders   Order[]    @relation("FarmerOrders")
+  refreshTokens  RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId      String  @db.Uuid
+  user       User     @relation(fields: [userId], references: [id])
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model ProductType {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(255) @unique
+
+  description String    @db.Text
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  listings    Listing[]
+  images      ProductTypeImage[]
+
+  @@map("product_types")
+}
+
+model Listing {
+  id            String        @id @default(uuid()) @db.Uuid
+  farmerId      String        @map("farmer_id") @db.Uuid
+  productTypeId String        @map("product_type_id") @db.Uuid
+  quantity      Decimal       @db.Decimal(18, 2)
+  unit          String        @db.VarChar(50)
+  pricePerKg    Decimal       @map("price_per_kg") @db.Decimal(18, 2)
+  description   String        @db.Text
+  location      String        @db.VarChar(255)
+  status        ListingStatus @default(active)
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  farmer        User          @relation("FarmerListings", fields: [farmerId], references: [id])
+  productType   ProductType   @relation(fields: [productTypeId], references: [id])
+  images        ListingImage[]
+  orders        Order[]       @relation("ListingOrders")
+
+  @@index([farmerId])
+  @@index([productTypeId , farmerId])
+
+  @@map("listings")
+}
+
+model ListingImage {
+  id        String  @id @default(uuid()) @db.Uuid
+  listingId String  @map("listing_id")  @db.Uuid 
+  
+  imageUrl  String  @map("image_url") @db.Text
+
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+ 
+
+  @@map("listing_images")
+}
+
+model ProductTypeImage {
+  id            String @id @default(uuid()) @db.Uuid
+  productTypeId String @db.Uuid
+
+  imageUrl      String @db.Text
+
+  productType   ProductType @relation(fields: [productTypeId], references: [id], onDelete: Cascade)
+
+  @@map("product_type_images")
+}
+
+model Order {
+  id          String      @id @default(uuid()) @db.Uuid
+  customerId  String      @map("customer_id") @db.Uuid
+  farmerId    String      @map("farmer_id") @db.Uuid
+  listingId   String      @map("listing_id") @db.Uuid
+  quantity    Decimal     @db.Decimal(18, 2)
+  unitPrice   Decimal     @map("unit_price") @db.Decimal(18, 2)
+  totalPrice  Decimal     @map("total_price") @db.Decimal(18, 2)
+  status      OrderStatus @default(pending)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  customer    User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  farmer      User        @relation("FarmerOrders", fields: [farmerId], references: [id])
+  listing     Listing     @relation("ListingOrders", fields: [listingId], references: [id])
+
+  @@map("orders")
+}
+
+enum UserRole {
+  customer
+  farmer
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+}
+
+enum ListingStatus {
+  active
+  inactive
+}
+
+enum OrderStatus {
+  pending
+  approved
+  rejected
+  completed
+  cancelled
+}
